@@ -106,6 +106,7 @@ class Translator(object):
     def __init__(self, *args, **kwargs):
         assert len(args) == 1
         self.utils = kwargs.get('util_obj')
+        self.proxies = kwargs.get('proxies')
         
         if 'google' in args:
             self.translator_name = 'google'
@@ -138,9 +139,18 @@ class Translator(object):
             labeled_sent = self.utils.sentence_labeled(sentence, head, tail)
         en2zh_sent = self.en2zh(labeled_sent)
         en2zh_sent = self.utils.sentence_delabeled(en2zh_sent, 'A'*15, 'B'*15)
-        time.sleep(0.5)
+        if self.translator_name in {'xiaoniu', 'baidu'}:
+            time.sleep(0.3)
         zh2en_sent = self.zh2en(en2zh_sent)
         delabeled_sent = self.utils.sentence_delabeled(zh2en_sent, head, tail)
+#         except:
+#             print('sentence: ', sentence)
+#             print('head: ', head)
+#             print('tail: ', tail)
+#             print('labeled_sent: ', labeled_sent)
+#             print('en2zh_sent: ', en2zh_sent)
+#             print('zh2en_sent: ', zh2en_sent)
+#             raise KeyboardInterrupt
         if tokenize:
             delabeled_sent = ' '.join(word_tokenize(delabeled_sent))
         return delabeled_sent.lower()

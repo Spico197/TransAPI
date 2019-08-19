@@ -12,6 +12,7 @@ class ProxyPool(object):
     def __init__(self):
         self.proxies_pool = dict()
         self.UA_headers = {'User-Agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Mobile Safari/537.36'}
+        self.black_list = set()
         
     def verify_proxy(self, ip, port, proto, timeout=1.5):
         try:
@@ -72,7 +73,8 @@ class ProxyPool(object):
             h = px['host']
             p = px['port']
             if t.lower().strip() in protocols:
-                if self.verify_proxy(h, p, t.strip().lower(), timeout=speed):
+                if self.verify_proxy(h, p, t.strip().lower(), timeout=speed) \
+                    and '{}:{}'.format(h, p) not in self.black_list:
                     self.proxies_pool[h] = {'port': p, 'proto': t}
                     self.save_proxy(h, p, t)
             print(' '*100 + '\r', end='')
@@ -122,11 +124,20 @@ class ProxyPool(object):
             print('Xici Proxies - Process: {}/{} - proxies: {}\r'.format(page, pages, len(self.proxies_pool)), end='')
 
     def get_proxies(self):
+        if len(self.proxies_pool) <= 0:
+            return {
+                'http': '{}://{}:{}',
+                'https': '{}://{}:{}'
+            }
         proxies = list(self.proxies_pool.items())
         phttp = random.choice(proxies)
-        phttps = random.choice(proxies)
+        phttps = phttp
         prox = {
             'http': '{}://{}:{}'.format(phttp[1]['proto'], phttp[0], phttp[1]['port']),
             'https': '{}://{}:{}'.format(phttps[1]['proto'], phttps[0], phttps[1]['port'])
         }
         return prox
+
+    def del_proxy(self, ip):
+        if self.proxies_pool.get(ip):
+            del self.proxies_pool[ip]

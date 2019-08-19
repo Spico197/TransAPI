@@ -10,15 +10,16 @@ import logging
 import multiprocessing as mp
 
 from transkit.translator import Translator
-from transkit.utils import FewRelUtils
+from transkit.utils import TacredUtils
 from transkit.proxy import ProxyPool
 from transkit.mpshare import SharedInfo
 from flask import Flask, render_template
 
 
-DATA_DIR = '/data/tzhu/FewRel'
+DATA_DIR = '/data/tzhu/TACRED'
 DATA_FILES = [
-    'fewrel_train.json', 'fewrel_val.json',
+#     'tacred_train.json', 'tacred_dev.json', 
+    'tacred_test.json',
 ]
 
 logger = logging.getLogger('trans_logger')
@@ -34,36 +35,31 @@ logger.addHandler(fh)
 
 
 def backforth_trans(name, trans_obj, ins, ppool, tokens=None, head_pos=None, tail_pos=None):
-    retries = 0
     while True:
+        sh = qmsg.get()
+        if name == 'google':
+            sh.ggl_proxies_num = len(ppool.proxies_pool)
+        elif name == 'baidu':
+            sh.baidu_proxies_num = len(ppool.proxies_pool)
+        elif name == 'xiaoniu':
+            sh.xiaoniu_proxies_num = len(ppool.proxies_pool)
+        qmsg.put(sh)
         try:
             sent = trans_obj.backforth_translate(ins['sentence'], ins['head'], ins['tail'],
                                                  tokens=tokens, head_pos=head_pos, tail_pos=tail_pos)
             if sent:
                 break
-#         except OSError:
-#             trans_obj = Translator(name, util_obj=trans_obj.utils, proxies=ppool.get_proxies())
-#             retries += 1
-#             print('.', end='')
-#         except json.JSONDecodeError:
-#             trans_obj = Translator(name, util_obj=trans_obj.utils, proxies=ppool.get_proxies())
-#             retries += 1
-#             print('.', end='')
-#         # except ConnectionError:
-#         #     trans_obj = Translator(name, util_obj=trans_obj.utils, proxies=ppool.get_proxies())
-#         #     retries += 1
-#         #     print('.', end='')
-#         except urllib3.exceptions.NewConnectionError:
-#             trans_obj = Translator(name, util_obj=trans_obj.utils, proxies=ppool.get_proxies())
-#             retries += 1
-#             print('.', end='')
-#         except urllib3.exceptions.MaxRetryError:
-#             trans_obj = Translator(name, util_obj=trans_obj.utils, proxies=ppool.get_proxies())
-#             retries += 1
-#             print('.', end='')
-        except:
+        except (OSError, json.JSONDecodeError, ConnectionError, \
+                urllib3.exceptions.NewConnectionError, urllib3.exceptions.MaxRetryError):
+            if len(ppool.proxies_pool) <= 0:
+                ppool.crawl_proxies('github', early_stopped=5)
             err = traceback.format_exc()
             logger.error('{} in backforthtrans function from main.py: {}'.format(name, err.replace('\n', '\t')))
+            if trans_obj.proxies:
+                ip = trans_obj.proxies['http'].split(':')[1].split('/')[-1]
+                port = trans_obj.proxies['http'].split(':')[-1]
+                ppool.del_proxy(ip)
+                ppool.black_list.add('{}:{}'.format(ip, port))
             trans_obj = Translator(name, util_obj=trans_obj.utils, proxies=ppool.get_proxies())
             
             sh = qmsg.get()
@@ -74,38 +70,65 @@ def backforth_trans(name, trans_obj, ins, ppool, tokens=None, head_pos=None, tai
             elif name == 'xiaoniu':
                 sh.xiaoniu_obj_changed_cnt += 1
             qmsg.put(sh)
-            
-            retries += 1
             print('.', end='')
-        if retries >= 30:
-            ppool.clear()
-            ppool.crawl_proxies('github', early_stopped=3)
+        except KeyError:
+            err = traceback.format_exc()
+            logger.error('{} in backforthtrans function from main.py: {}'.format(name, err.replace('\n', '\t')))
+            if name == 'baidu':
+                continue
+        except KeyboardInterrupt:
+            raise KeyboardInterrupt
+        except Exception as e:
+            err = traceback.format_exc()
+            logger.error('{} in backforthtrans function from main.py: {}'.format(name, err.replace('\n', '\t')))
+            if 'sre_constants.error' in str(e.__class__):
+                with open('middle/error_process_instances', 'a', encoding='utf-8') as f:
+                    f.write('{}\n'.format(json.dumps(ins)))
+                sent = ""
+            break
+            
     return trans_obj, sent, ppool
 
 
 def multi_trans(param):
     cnt = 0; file_data = param['data']
-    ppool = param['ppool']
+#     ppool = param['ppool']
+    ppool = ProxyPool()
+    ppool.clear()
+    ppool.crawl_proxies('github', early_stopped=50)
+        
     sh = qmsg.get()
     if param['name'] == 'google':
-        sh.ggl_tot_cnt = len(file_data) - param['start'] + 1
+#         sh.ggl_tot_cnt = len(file_data) - param['start'] + 1
+        sh.ggl_tot_cnt = len(file_data)
+        sh.ggl_avg_time = 3.0
     elif param['name'] == 'baidu':
-        sh.baidu_tot_cnt = len(file_data) - param['start'] + 1
+        sh.baidu_tot_cnt = len(file_data)
+        sh.baidu_avg_time = 3.0
     elif param['name'] == 'xiaoniu':
-        sh.xiaoniu_tot_cnt = len(file_data) - param['start'] + 1
+        sh.xiaoniu_tot_cnt = len(file_data)
+        sh.xiaoniu_avg_time = 3.0
     qmsg.put(sh)
     
     if not os.path.exists('middle'):
         os.mkdir('middle')
         
-    t = Translator(param['name'], util_obj=FewRelUtils())
+    t = Translator(param['name'], util_obj=TacredUtils())
     for ins in file_data:
         cnt += 1
         if cnt < param['start']:
+            sh = qmsg.get()
+            if param['name'] == 'google':
+                sh.ggl_cnt += 1
+            elif param['name'] == 'baidu':
+                sh.baidu_cnt += 1
+            elif param['name'] == 'xiaoniu':
+                sh.xiaoniu_cnt += 1
+            qmsg.put(sh)
             continue
-        tokens_ = ins['original_info']['tokens']
-        head_pos_ = ins['original_info']['h'][-1]
-        tail_pos_ = ins['original_info']['t'][-1]
+        tokens_ = ins['original_info']['token']
+        head_pos_ = [[ins['original_info']['subj_start'], ins['original_info']['subj_end']]]
+        tail_pos_ = [[ins['original_info']['obj_start'], ins['original_info']['obj_end']]]
         st = time.time()
         t, ins['translation'][param['name']], ppool = backforth_trans(param['name'], t, ins, ppool,
                                                                       tokens=tokens_, 
@@ -163,7 +186,7 @@ def ensemble(file, names):
     
             
 def main_thread(DATA_FILES):
-    utils = FewRelUtils()
+    utils = TacredUtils()
     for file in DATA_FILES:
         if qmsg.qsize() > 0:
             qmsg.get()
@@ -177,29 +200,28 @@ def main_thread(DATA_FILES):
         """start multi processing"""
 
         pool = mp.Pool()
-        gppool = ProxyPool()
-        gppool.clear()
-        gppool.crawl_proxies('github', early_stopped=200)
-        nppool = ProxyPool()
-        nppool.clear()
-        nppool.crawl_proxies('github', early_stopped=5)
-        bppool = ProxyPool()
-        bppool.clear()
-        bppool.crawl_proxies('github', early_stopped=5)
         
+#         gppool = ProxyPool()
+#         gppool.clear()
+#         print('google pool')
+#         gppool.crawl_proxies('github', early_stopped=20)
+#         nppool = ProxyPool()
+#         nppool.clear()
+#         print('\nxiaoniu pool')
+#         nppool.crawl_proxies('github', early_stopped=20)
+#         bppool = ProxyPool()
+#         bppool.clear()
+#         print('\nbaidu pool')
+#         bppool.crawl_proxies('github', early_stopped=20)
         
-        if file == 'fewrel_train.json':
-            params = [
-                {'file': file.split('.')[0], 'name':'google', 'data': file_data.copy(), 'start': 960, 'ppool': gppool},
-                {'file': file.split('.')[0], 'name':'xiaoniu', 'data': file_data.copy(), 'start': 17759, 'ppool': nppool},
-                {'file': file.split('.')[0], 'name':'baidu', 'data': file_data.copy(), 'start': 17646, 'ppool': bppool}
-            ]
-        else:
-            params = [
-                {'file': file.split('.')[0], 'name':'google', 'data': file_data.copy(), 'start': 1, 'ppool': gppool},
-                {'file': file.split('.')[0], 'name':'xiaoniu', 'data': file_data.copy(), 'start': 1, 'ppool': nppool},
-                {'file': file.split('.')[0], 'name':'baidu', 'data': file_data.copy(), 'start': 1, 'ppool': bppool}
-            ]
+        params = [
+#             {'file': file.split('.')[0], 'name':'google', 'data': file_data.copy(), 'start': 2780, 'ppool': gppool},
+#             {'file': file.split('.')[0], 'name':'xiaoniu', 'data': file_data.copy(), 'start': 2960, 'ppool': nppool},
+#             {'file': file.split('.')[0], 'name':'baidu', 'data': file_data.copy(), 'start': 2780, 'ppool': bppool}
+#             {'file': file.split('.')[0], 'name':'google', 'data': file_data.copy(), 'start': 15130},
+            {'file': file.split('.')[0], 'name':'xiaoniu', 'data': file_data.copy(), 'start': 12365},
+#             {'file': file.split('.')[0], 'name':'baidu', 'data': file_data.copy(), 'start': 15500}
+        ]
         
         pool.map(multi_trans, params)
         pool.close()

@@ -29,6 +29,11 @@ $ python
 
 ![Report](docs/report.jpg)
 
+## Updates
+
+- v0.1.3: Optimize proxy pools, add blacklist mechanism. Proxy pools will get rid of invalid proxies, which  would not be collected
+- v0.1.2: Basic parallel translation edition
+
 ## LICENSE
 
 MIT LICENSE

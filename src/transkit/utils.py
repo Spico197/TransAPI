@@ -3,7 +3,7 @@ import json
 
 
 class UtilsMeta(object):
-    def tokens2sentence(self, tokens, head, tail):
+    def tokens2sentence(self, tokens):
         sentence = ' '.join(tokens)
         sentence = ' '.join(re.sub(r'\s', ' ', sentence).split())
         return sentence.lower()
@@ -71,8 +71,7 @@ class FewRelUtils(UtilsMeta):
                     }
                 }
                 one_data['original_info'] = ins
-                one_data['sentence'] = self.tokens2sentence([x.lower() for x in \
-                                                             ins['tokens']], ins['h'][0].lower(), ins['t'][0].lower())
+                one_data['sentence'] = self.tokens2sentence([x.lower() for x in ins['tokens']])
                 one_data['relation'] = rel
                 one_data['head'] = ins['h'][0].lower()
                 one_data['tail'] = ins['t'][0].lower()
@@ -105,10 +104,10 @@ class TacredUtils(UtilsMeta):
                 }
             }
             one_data['original_info'] = ins
-            one_data['sentence'] = ' '.join(ins['token']).lower()
+            one_data['sentence'] = self.tokens2sentence([x.lower() for x in ins['token']])
             one_data['relation'] = ins['relation']
-            one_data['head'] = ins['token'][ins['subj_start']: ins['subj_end'] + 1].lower()
-            one_data['tail'] = ins['token'][ins['obj_start']: ins['obj_end'] + 1].lower()
+            one_data['head'] = ' '.join(ins['token'][ins['subj_start']: ins['subj_end'] + 1]).lower()
+            one_data['tail'] = ' '.join(ins['token'][ins['obj_start']: ins['obj_end'] + 1]).lower()
             return_data.append(one_data)
             cnt += 1
         return return_data
