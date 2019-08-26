@@ -1,5 +1,6 @@
 import re
 import json
+from nltk import word_tokenize
 
 
 class UtilsMeta(object):
@@ -111,3 +112,59 @@ class TacredUtils(UtilsMeta):
             return_data.append(one_data)
             cnt += 1
         return return_data
+
+    
+class SemEval2010Task8Utils(UtilsMeta):
+    def __init__(self, *args, **kwargs):
+        super(SemEval2010Task8Utils, self).__init__(*args, **kwargs)
+        
+    def load_data(self, filepath):
+        data = []
+        with open(filepath, 'r', encoding='utf-8') as f:
+            texts = f.readlines()
+
+            ori_ids = re.findall(r'(\d+)\t".*?"', '\n'.join(texts))
+            sentences = re.findall(r'\d+\t"(.*)"\n', '\n'.join(texts))
+            relations = re.findall(r'(.*?(\(e2,e1\)|\(e1,e2\))|\nOther)', '\n'.join(texts))
+            relations = [x[0].strip() for x in relations]
+            comments = re.findall(r'\nComment:(.*?)\n', '\n'.join(texts))
+            comments = [x.strip() for x in comments]
+            heads = re.findall(r'<e1>(.*?)</e1>', '\n'.join(texts))
+            tails = re.findall(r'<e2>(.*?)</e2>', '\n'.join(texts))
+    #         print(len(sentences))
+    #         print(sentences)
+            cnt = 1
+            for ori_id, sentence, relation, comment, head, tail in \
+                zip(ori_ids, sentences, relations, comments, heads, tails):
+                new_sent = re.sub(r'<e1>.*?</e1>', ' {} '.format(head), sentence)
+                new_sent = re.sub(r'<e2>.*?</e2>', ' {} '.format(tail), new_sent)
+                new_sent = ' '.join(word_tokenize(new_sent))
+                head_pos = [[new_sent.split().index(head.split()[0]), \
+                             new_sent.split().index(head.split()[0]) + len(head.split())]]
+                tail_pos = [[new_sent.split().index(tail.split()[0]), \
+                             new_sent.split().index(tail.split()[0]) + len(tail.split())]]
+                one_data = {
+                    "id": str(cnt),
+                    "original_info": {
+                        "id": ori_id,
+                        "sentence": sentence,
+                        "relation": relation,
+                        "comment": comment,
+                        "head_pos": head_pos,
+                        "tail_pos": tail_pos,
+                        "token": new_sent.split(),
+                    },
+                    "sentence": new_sent,
+                    "relation": relation,
+                    "head": head,
+                    "tail": tail,
+                    "translation": {
+                        "google": "",
+                        "baidu": "",
+                        "xiaoniu": ""
+                    }
+                }
+                data.append(one_data)
+
+                cnt += 1
+        return data

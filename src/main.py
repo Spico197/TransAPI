@@ -10,16 +10,16 @@ import logging
 import multiprocessing as mp
 
 from transkit.translator import Translator
-from transkit.utils import TacredUtils
+from transkit.utils import SemEval2010Task8Utils
 from transkit.proxy import ProxyPool
 from transkit.mpshare import SharedInfo
 from flask import Flask, render_template
 
 
-DATA_DIR = '/data/tzhu/TACRED'
+DATA_DIR = '/data/tzhu/SemEval2010-Task8'
 DATA_FILES = [
-#     'tacred_train.json', 'tacred_dev.json', 
-    'tacred_test.json',
+#     'semeval2010task8_test.txt', 
+    'semeval2010task8_train.txt', 
 ]
 
 logger = logging.getLogger('trans_logger')
@@ -49,7 +49,7 @@ def backforth_trans(name, trans_obj, ins, ppool, tokens=None, head_pos=None, tai
                                                  tokens=tokens, head_pos=head_pos, tail_pos=tail_pos)
             if sent:
                 break
-        except (OSError, json.JSONDecodeError, ConnectionError, \
+        except (OSError, json.JSONDecodeError, ConnectionError, KeyError, \
                 urllib3.exceptions.NewConnectionError, urllib3.exceptions.MaxRetryError):
             if len(ppool.proxies_pool) <= 0:
                 ppool.crawl_proxies('github', early_stopped=5)
@@ -71,18 +71,19 @@ def backforth_trans(name, trans_obj, ins, ppool, tokens=None, head_pos=None, tai
                 sh.xiaoniu_obj_changed_cnt += 1
             qmsg.put(sh)
             print('.', end='')
-        except KeyError:
-            err = traceback.format_exc()
-            logger.error('{} in backforthtrans function from main.py: {}'.format(name, err.replace('\n', '\t')))
-            if name == 'baidu':
-                continue
+#         except KeyError:
+#             err = traceback.format_exc()
+#             logger.error('{} in backforthtrans function from main.py: {}'.format(name, err.replace('\n', '\t')))
+#             if name == 'baidu':
+#                 time.sleep(5)
+#                 continue
         except KeyboardInterrupt:
             raise KeyboardInterrupt
         except Exception as e:
             err = traceback.format_exc()
             logger.error('{} in backforthtrans function from main.py: {}'.format(name, err.replace('\n', '\t')))
             if 'sre_constants.error' in str(e.__class__):
-                with open('middle/error_process_instances', 'a', encoding='utf-8') as f:
+                with open('middle/error_semeval_{}_process_instances'.format(name), 'a', encoding='utf-8') as f:
                     f.write('{}\n'.format(json.dumps(ins)))
                 sent = ""
             break
@@ -93,7 +94,7 @@ def backforth_trans(name, trans_obj, ins, ppool, tokens=None, head_pos=None, tai
 def multi_trans(param):
     cnt = 0; file_data = param['data']
 #     ppool = param['ppool']
-    ppool = ProxyPool()
+    ppool = ProxyPool(param['name'])
     ppool.clear()
     ppool.crawl_proxies('github', early_stopped=50)
         
@@ -101,19 +102,16 @@ def multi_trans(param):
     if param['name'] == 'google':
 #         sh.ggl_tot_cnt = len(file_data) - param['start'] + 1
         sh.ggl_tot_cnt = len(file_data)
-        sh.ggl_avg_time = 3.0
     elif param['name'] == 'baidu':
         sh.baidu_tot_cnt = len(file_data)
-        sh.baidu_avg_time = 3.0
     elif param['name'] == 'xiaoniu':
         sh.xiaoniu_tot_cnt = len(file_data)
-        sh.xiaoniu_avg_time = 3.0
     qmsg.put(sh)
     
     if not os.path.exists('middle'):
         os.mkdir('middle')
         
-    t = Translator(param['name'], util_obj=TacredUtils())
+    t = Translator(param['name'], util_obj=SemEval2010Task8Utils())
     for ins in file_data:
         cnt += 1
         if cnt < param['start']:
@@ -127,8 +125,8 @@ def multi_trans(param):
             qmsg.put(sh)
             continue
         tokens_ = ins['original_info']['token']
-        head_pos_ = [[ins['original_info']['subj_start'], ins['original_info']['subj_end']]]
-        tail_pos_ = [[ins['original_info']['obj_start'], ins['original_info']['obj_end']]]
+        head_pos_ = ins['original_info']['head_pos']
+        tail_pos_ = ins['original_info']['tail_pos']
         st = time.time()
         t, ins['translation'][param['name']], ppool = backforth_trans(param['name'], t, ins, ppool,
                                                                       tokens=tokens_, 
@@ -140,17 +138,17 @@ def multi_trans(param):
             sh.ggl_cnt += 1
             sh.ggl_last_time = et
             sh.ggl_tot_time += et
-            sh.ggl_avg_time = sh.ggl_tot_time / sh.ggl_cnt
+            sh.ggl_avg_time = sh.ggl_tot_time / (sh.ggl_cnt - param['start'] + 1)
         elif param['name'] == 'baidu':
             sh.baidu_cnt += 1
             sh.baidu_last_time = et
             sh.baidu_tot_time += et
-            sh.baidu_avg_time = sh.baidu_tot_time / sh.baidu_cnt
+            sh.baidu_avg_time = sh.baidu_tot_time / (sh.baidu_cnt - param['start'] + 1)
         elif param['name'] == 'xiaoniu':
             sh.xiaoniu_cnt += 1
             sh.xiaoniu_last_time = et
             sh.xiaoniu_tot_time += et
-            sh.xiaoniu_avg_time = sh.xiaoniu_tot_time / sh.xiaoniu_cnt
+            sh.xiaoniu_avg_time = sh.xiaoniu_tot_time / (sh.xiaoniu_cnt - param['start'] + 1)
         qmsg.put(sh)
         with open('middle/' + param['file'] + '_' + param['name'], 'a', encoding='utf-8') as f:
             f.write('{}\n'.format(json.dumps(ins)))
@@ -186,7 +184,7 @@ def ensemble(file, names):
     
             
 def main_thread(DATA_FILES):
-    utils = TacredUtils()
+    utils = SemEval2010Task8Utils()
     for file in DATA_FILES:
         if qmsg.qsize() > 0:
             qmsg.get()
@@ -218,9 +216,9 @@ def main_thread(DATA_FILES):
 #             {'file': file.split('.')[0], 'name':'google', 'data': file_data.copy(), 'start': 2780, 'ppool': gppool},
 #             {'file': file.split('.')[0], 'name':'xiaoniu', 'data': file_data.copy(), 'start': 2960, 'ppool': nppool},
 #             {'file': file.split('.')[0], 'name':'baidu', 'data': file_data.copy(), 'start': 2780, 'ppool': bppool}
-#             {'file': file.split('.')[0], 'name':'google', 'data': file_data.copy(), 'start': 15130},
-            {'file': file.split('.')[0], 'name':'xiaoniu', 'data': file_data.copy(), 'start': 12365},
-#             {'file': file.split('.')[0], 'name':'baidu', 'data': file_data.copy(), 'start': 15500}
+            {'file': file.split('.')[0], 'name':'google', 'data': file_data.copy(), 'start': 1},
+            {'file': file.split('.')[0], 'name':'xiaoniu', 'data': file_data.copy(), 'start': 1},
+            {'file': file.split('.')[0], 'name':'baidu', 'data': file_data.copy(), 'start': 1}
         ]
         
         pool.map(multi_trans, params)
@@ -278,3 +276,4 @@ if __name__ == "__main__":
     main_thread_handler.start()
     watch_thread_handler.start()
     flask_thread_handler.start()
+#     ensemble('semeval2010task8_train', ['google', 'baidu', 'xiaoniu'])

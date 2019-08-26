@@ -9,10 +9,11 @@ from lxml import etree
 
 
 class ProxyPool(object):
-    def __init__(self):
+    def __init__(self, name):
         self.proxies_pool = dict()
         self.UA_headers = {'User-Agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Mobile Safari/537.36'}
         self.black_list = set()
+        self.name = name
         
     def verify_proxy(self, ip, port, proto, timeout=1.5):
         try:
@@ -21,6 +22,8 @@ class ProxyPool(object):
                 'http': "{}://{}:{}".format(proto, ip, port),
                 'https': "{}://{}:{}".format(proto, ip, port)
             }
+            if self.name != 'google':
+                return True
             response = requests.get('https://translate.google.cn', headers=self.UA_headers, proxies=pxs, timeout=timeout)
             response.raise_for_status()
             return True
@@ -49,10 +52,17 @@ class ProxyPool(object):
         self.proxies_pool = proxies
 
     def crawl_proxies(self, name, *args, **kwargs):
-        if name == 'github':
-            self._crawl_github_proxies(*args, **kwargs)
-        elif name == 'xici':
-            self._crawl_xici_proxies(*args, **kwargs)
+        while True:
+            try:
+                if name == 'github':
+                    self._crawl_github_proxies(*args, **kwargs)
+                elif name == 'xici':
+                    self._crawl_xici_proxies(*args, **kwargs)
+                break
+            except KeyboardInterrupt:
+                break
+            except Exception as err:
+                continue
     
     def _crawl_github_proxies(self, speed=1.5, protocols={'http', 'https'}, early_stopped=None):
         url = 'https://raw.githubusercontent.com/fate0/proxylist/master/proxy.list'
@@ -78,7 +88,7 @@ class ProxyPool(object):
                     self.proxies_pool[h] = {'port': p, 'proto': t}
                     self.save_proxy(h, p, t)
             print(' '*100 + '\r', end='')
-            print('Github Proxies - Process: {}/{} - lens: {}\r'.format(cnt, lens, len(self.proxies_pool)), end='')
+            print('Github Proxies - {} - Process: {}/{} - lens: {}'.format(self.name, cnt, lens, len(self.proxies_pool)))
             cnt += 1
             if early_stopped:
                 if len(self.proxies_pool) >= early_stopped:

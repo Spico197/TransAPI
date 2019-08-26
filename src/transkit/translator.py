@@ -139,8 +139,10 @@ class Translator(object):
             labeled_sent = self.utils.sentence_labeled(sentence, head, tail)
         en2zh_sent = self.en2zh(labeled_sent)
         en2zh_sent = self.utils.sentence_delabeled(en2zh_sent, 'A'*15, 'B'*15)
-        if self.translator_name in {'xiaoniu', 'baidu'}:
-            time.sleep(0.3)
+        if self.translator_name == 'xiaoniu':
+            time.sleep(0.5)
+        elif self.translator_name == 'baidu':
+            time.sleep(0.5)
         zh2en_sent = self.zh2en(en2zh_sent)
         delabeled_sent = self.utils.sentence_delabeled(zh2en_sent, head, tail)
 #         except:
