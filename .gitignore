@@ -1,3 +1,8 @@
 .ipynb_checkpoints/
 *.pyc
 __pycache__/
+transapi_test/
+config.yaml
+log.log
+templates/
+outputs/

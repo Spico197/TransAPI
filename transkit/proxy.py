@@ -14,7 +14,7 @@ class ProxyPool(object):
         self.UA_headers = {'User-Agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.142 Mobile Safari/537.36'}
         self.black_list = set()
         self.name = name
-        
+
     def verify_proxy(self, ip, port, proto, timeout=1.5):
         try:
             telnetlib.Telnet(ip, port=port, timeout=timeout)
@@ -27,19 +27,19 @@ class ProxyPool(object):
             response = requests.get('https://translate.google.cn', headers=self.UA_headers, proxies=pxs, timeout=timeout)
             response.raise_for_status()
             return True
-        except:
+        except Exception:
             return False
 
     def save_proxy(self, ip, port, proto, filepath='./proxy_file_saved'):
         try:
             with open(filepath, 'a', encoding='utf-8') as f:
                 f.write("{}:{}:{}\n".format(proto, ip, port))
-        except:
+        except Exception:
             pass
-    
+
     def clear(self):
         self.proxies_pool.clear()
-    
+
     def load_proxy_file(self, file_path):
         proxies = dict()
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -61,9 +61,9 @@ class ProxyPool(object):
                 break
             except KeyboardInterrupt:
                 break
-            except Exception as err:
+            except Exception:
                 continue
-    
+
     def _crawl_github_proxies(self, speed=1.5, protocols={'http', 'https'}, early_stopped=None):
         url = 'https://raw.githubusercontent.com/fate0/proxylist/master/proxy.list'
         while True:
@@ -71,7 +71,7 @@ class ProxyPool(object):
                 response = requests.get(url, headers=self.UA_headers, timeout=5.0)
                 response.raise_for_status()
                 break
-            except:
+            except Exception:
                 time.sleep(5)
                 continue
         lines = response.text.split('\n')
@@ -84,10 +84,10 @@ class ProxyPool(object):
             p = px['port']
             if t.lower().strip() in protocols:
                 if self.verify_proxy(h, p, t.strip().lower(), timeout=speed) \
-                    and '{}:{}'.format(h, p) not in self.black_list:
+                        and '{}:{}'.format(h, p) not in self.black_list:
                     self.proxies_pool[h] = {'port': p, 'proto': t}
                     self.save_proxy(h, p, t)
-            print(' '*100 + '\r', end='')
+            print(' ' * 100 + '\r', end='')
             print('Github Proxies - {} - Process: {}/{} - lens: {}'.format(self.name, cnt, lens, len(self.proxies_pool)))
             cnt += 1
             if early_stopped:
@@ -130,7 +130,7 @@ class ProxyPool(object):
                         if early_stopped:
                             if len(self.proxies_pool) >= early_stopped:
                                 break
-            print(' '*100 + '\r', end='')
+            print(' ' * 100 + '\r', end='')
             print('Xici Proxies - Process: {}/{} - proxies: {}\r'.format(page, pages, len(self.proxies_pool)), end='')
 
     def get_proxies(self):

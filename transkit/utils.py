@@ -1,5 +1,6 @@
 import re
 import json
+
 from nltk import word_tokenize
 
 
@@ -11,17 +12,17 @@ class UtilsMeta(object):
 
     def load_data(self, path):
         raise NotImplementedError
-    
+
     def sentence_labeled(self, sentence, head, tail, replace=True):
         sent = sentence
         if replace:
-            sent.replace(head, 'A'*15)
-            sent.replace(tail, 'B'*15)
+            sent.replace(head, 'A' * 15)
+            sent.replace(tail, 'B' * 15)
         else:
             sent = sent.replace(head, '<e1>' + head + '<e1e>')
             sent = sent.replace(tail, '<e2>' + tail + '<e2e>')
         return sent
-    
+
     def tokens_labeled(self, tokens, head_pos, tail_pos, replace=True):
         tokens = [x.lower().strip() for x in tokens]
         for pos in head_pos:
@@ -32,10 +33,10 @@ class UtilsMeta(object):
             tokens[pos[-1]] = tokens[pos[-1]] + '<e2e>'
         sent = ' '.join(filter(lambda x: len(x.strip()) > 0, tokens))
         if replace:
-            sent = re.sub(r'<\s?[eE]1\s?>.*?<\s?[eE]1[eE]\s?>', 'A'*15, sent)
-            sent = re.sub(r'<\s?[eE]2\s?>.*?<\s?[eE]2[eE]\s?>', 'B'*15, sent)
+            sent = re.sub(r'<\s?[eE]1\s?>.*?<\s?[eE]1[eE]\s?>', 'A' * 15, sent)
+            sent = re.sub(r'<\s?[eE]2\s?>.*?<\s?[eE]2[eE]\s?>', 'B' * 15, sent)
         return sent.lower()
-    
+
     def sentence_delabeled(self, sentence, head, tail, replace=True):
         sent = sentence
         if replace:
@@ -46,11 +47,11 @@ class UtilsMeta(object):
             sent = re.sub(r'<\s?[eE]2\s?>.*?<\s?[eE]2[eE]\s?>', tail, sent)
         return sent.lower().strip()
 
-    
+
 class FewRelUtils(UtilsMeta):
     def __init__(self, *args, **kwargs):
         super(FewRelUtils, self).__init__(*args, **kwargs)
-        
+
     def load_data(self, path):
         return_data = []
         with open(path, 'r', encoding='utf-8') as f:
@@ -65,11 +66,6 @@ class FewRelUtils(UtilsMeta):
                     "relation": "",
                     "head": "",
                     "tail": "",
-                    "translation": {
-                        "google": "",
-                        "baidu": "",
-                        "xiaoniu": ""
-                    }
                 }
                 one_data['original_info'] = ins
                 one_data['sentence'] = self.tokens2sentence([x.lower() for x in ins['tokens']])
@@ -80,11 +76,11 @@ class FewRelUtils(UtilsMeta):
                 cnt += 1
         return return_data
 
-    
+
 class TacredUtils(UtilsMeta):
     def __init__(self, *args, **kwargs):
         super(TacredUtils, self).__init__(*args, **kwargs)
-    
+
     def load_data(self, path):
         return_data = []
         with open(path, 'r', encoding='utf-8') as f:
@@ -98,11 +94,6 @@ class TacredUtils(UtilsMeta):
                 "relation": "",
                 "head": "",
                 "tail": "",
-                "translation": {
-                    "google": "",
-                    "baidu": "",
-                    "xiaoniu": ""
-                }
             }
             one_data['original_info'] = ins
             one_data['sentence'] = self.tokens2sentence([x.lower() for x in ins['token']])
@@ -113,11 +104,11 @@ class TacredUtils(UtilsMeta):
             cnt += 1
         return return_data
 
-    
+
 class SemEval2010Task8Utils(UtilsMeta):
     def __init__(self, *args, **kwargs):
         super(SemEval2010Task8Utils, self).__init__(*args, **kwargs)
-        
+
     def load_data(self, filepath):
         data = []
         with open(filepath, 'r', encoding='utf-8') as f:
@@ -135,13 +126,13 @@ class SemEval2010Task8Utils(UtilsMeta):
     #         print(sentences)
             cnt = 1
             for ori_id, sentence, relation, comment, head, tail in \
-                zip(ori_ids, sentences, relations, comments, heads, tails):
+                    zip(ori_ids, sentences, relations, comments, heads, tails):
                 new_sent = re.sub(r'<e1>.*?</e1>', ' {} '.format(head), sentence)
                 new_sent = re.sub(r'<e2>.*?</e2>', ' {} '.format(tail), new_sent)
                 new_sent = ' '.join(word_tokenize(new_sent))
-                head_pos = [[new_sent.split().index(head.split()[0]), \
+                head_pos = [[new_sent.split().index(head.split()[0]),
                              new_sent.split().index(head.split()[0]) + len(head.split())]]
-                tail_pos = [[new_sent.split().index(tail.split()[0]), \
+                tail_pos = [[new_sent.split().index(tail.split()[0]),
                              new_sent.split().index(tail.split()[0]) + len(tail.split())]]
                 one_data = {
                     "id": str(cnt),
@@ -158,11 +149,6 @@ class SemEval2010Task8Utils(UtilsMeta):
                     "relation": relation,
                     "head": head,
                     "tail": tail,
-                    "translation": {
-                        "google": "",
-                        "baidu": "",
-                        "xiaoniu": ""
-                    }
                 }
                 data.append(one_data)
 

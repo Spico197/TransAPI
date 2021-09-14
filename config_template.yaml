@@ -1,0 +1,27 @@
+# data source
+data_dir: '/data/tzhu/Data/SemEval2010-Task8/'  # data directory
+data_files:   # input data file names
+  - 'semeval2010task8_test.txt'
+data_utils: SemEval2010Task8Utils   # data utils (for loading data into task-oriented format)
+
+output_dir: 'outputs/semeval'  # output directory
+
+# control config
+start_from: 1        # start from where you stopped (count from 1)
+max_retries: 5       # number of max retry times
+time_interval: 1.0   # request interval, sleep in seconds
+timeout: 3.0         # request timeout (seconds)
+log_path: 'log.log'  # path to log file
+
+# translator
+translator: ReTranslatorViaCodeSwitch   # ReTranslatorViaAB, ReTranslatorViaCodeSwitch, ParaphraseTranslator
+trans_type: BaiduTrans    # BaiduTrans, NiuTrans
+
+NiuTrans:
+  apikey: 'xxx'
+  api_url: 'http://api.niutrans.vip/NiuTransServer/translation'
+
+BaiduTrans:
+  appid: 'xxx'
+  secret_key: 'xxx'
+  api_url: 'http://api.fanyi.baidu.com/api/trans/vip/translate'
